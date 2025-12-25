@@ -1,0 +1,297 @@
+import ipywidgets as widgets
+from IPython.display import display, HTML
+from ipywidgets import Layout
+
+# --- Comprehensive CSS for internal widget styling and global overrides ---
+full_css_content = f"""
+<style>
+/* Global Page Styling (from previous steps, combined here) */
+body {{
+    background: linear-gradient(135deg, #0b1020, #19243a);
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif; /* Consistent font for body */
+}}
+
+
+/* Card styling applied to the main calculator content VBox */
+/* This targets the VBox that becomes the main calculator card. */
+.calculator-card {{
+    background: rgba(255, 255, 255, 0.08); /* Semi-transparent background for card */
+    border-radius: 24px; /* Rounded corners */
+    padding: 32px; /* Soft inner padding */
+    box-shadow: 0 18px 45px rgba(0,0,0,0.5); /* Large, very soft box-shadow */
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px); /* Webkit prefix for compatibility */
+    color: #e3ecff; /* Default text color inside card */
+}}
+
+
+/* Internal Widget Styling */
+
+
+/* General widget-label styling for all ipywidgets labels */
+.widget-label {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    color: #c8d2ff; /* Soft desaturated blue */
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    direction: ltr; /* Ensure LTR direction for text alignment */
+    unicode-bidi: plaintext; /* Ensure numbers are not affected by surrounding text direction */
+}}
+
+
+/* Input Boxes (IntText, FloatText, Text) - 3D & Eye-Friendly */
+/* مهم: نستهدف كل input داخل sp-input سواء كان type=text أو number */
+.sp-input input {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(145deg, #1c2333, #111622); /* Dark textured background */
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #e3ecff; /* Light text color */
+    box-shadow:
+        4px 4px 10px rgba(0,0,0,0.65), /* Depth shadow */
+        -3px -3px 8px rgba(255,255,255,0.04); /* Light source highlight */
+    transition: all 0.2s ease-in-out;
+    outline: none;
+    -webkit-appearance: none; /* Remove default browser styling */
+
+    /* Force Western Numerals (0-9) */
+    direction: ltr !important;
+    unicode-bidi: plaintext !important;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum", "tnum";
+}}
+
+.sp-input input:focus {{
+    border-color: #33e0ff; /* Accent color on focus */
+    box-shadow:
+        0 0 15px rgba(51, 224, 255, 0.6), /* Soft cyan glow */
+        4px 4px 12px rgba(0,0,0,0.7); /* Stronger depth shadow */
+}}
+
+
+/* Buttons (Slight 3D) */
+.sp-button-main .widget-button {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    border-radius: 12px;
+    border: none;
+    color: #e3ecff;
+    padding: 8px 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background-size: 200% auto; /* For gradient animation */
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.55); /* Initial 3D lift */
+    position: relative;
+    overflow: hidden;
+}}
+
+
+/* Specific background gradients for different button_styles */
+.sp-button-main.mod-success .widget-button {{
+    background-image: linear-gradient(to right, #37d46b 0%, #2ca956 50%, #37d46b 100%);
+}}
+.sp-button-main.mod-info .widget-button {{
+    background-image: linear-gradient(to right, #33aaff 0%, #2087e6 50%, #33aaff 100%);
+}}
+.sp-button-main.mod-warning .widget-button {{
+    background-image: linear-gradient(to right, #ffcc00 0%, #cc9900 50%, #ffcc00 100%);
+    color: #222a3b; /* Darker text for warning contrast */
+}}
+
+.sp-button-main .widget-button:hover {{
+    background-position: right center;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.65);
+}}
+
+.sp-button-main .widget-button:active {{
+    transform: translateY(1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}}
+
+
+/* Tabs */
+.sp-tabs .p-TabBar-tab {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(145deg, #151a26, #1c2435); /* Background inside card */
+    color: #7f8bb8; /* Muted text */
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom: 2px solid transparent; /* Placeholder for active border */
+    transition: all 0.2s ease-in-out;
+    margin-right: 5px;
+    padding: 8px 15px;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2), inset -2px -2px 5px rgba(255,255,255,0.02); /* Inner shadow for depth */
+}}
+
+.sp-tabs .p-TabBar-tab.p-mod-current {{
+    background: linear-gradient(145deg, #1e2738, #111622); /* Active tab background, slightly different */
+    color: #e3ecff; /* Bright text for active */
+    border-bottom: 2px solid #33e0ff; /* Cyan accent border */
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.3), inset 2px 2px 5px rgba(0,0,0,0.3); /* Enhanced shadow for active */
+}}
+
+.sp-tabs .p-TabBar-tab:hover:not(.p-mod-current) {{
+    background: linear-gradient(145deg, #1c2435, #151a26);
+    color: #a0aec0;
+}}
+
+
+/* Adjust general headings/HTML within the calculator for dark theme */
+h2 {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    color: #e3ecff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}}
+
+
+/* Styling for the display_output (HTML widget) to ensure correct font and numeral display */
+div[data-jupyter-widget-model-id]:has(div[style*="white-space: normal"]) > div {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif !important;
+    direction: ltr !important;
+    unicode-bidi: plaintext !important;
+    font-feature-settings: "lnum", "tnum" !important;
+}}
+</style>
+"""
+
+style_html = widgets.HTML(value=full_css_content)
+
+# --- Apply classes to existing widgets ---
+
+# Counting Tab widgets
+n_counting.add_class("sp-input")
+r_counting.add_class("sp-input")
+perm_button.add_class("sp-button-main")
+comb_button.add_class("sp-button-main")
+
+# Basic Probability Tab widgets
+fav_basic.add_class("sp-input")
+total_basic.add_class("sp-input")
+pa_basic.add_class("sp-input")
+pb_basic.add_class("sp-input")
+pa_intersect_b_basic.add_class("sp-input")
+pa_fav_total_button.add_class("sp-button-main")
+union_button.add_class("sp-button-main")
+complement_button.add_class("sp-button-main")
+
+# Conditional & Independence Tab widgets
+pa_cond.add_class("sp-input")
+pb_cond.add_class("sp-input")
+pa_intersect_b_cond.add_class("sp-input")
+pb_given_a_button.add_class("sp-button-main")
+pa_given_b_button.add_class("sp-button-main")
+independent_intersection_button.add_class("sp-button-main")
+check_independence_button.add_class("sp-button-main")
+
+# Total Probability & Bayes' Rule Tab widgets
+pa1_bayes.add_class("sp-input")
+pa2_bayes.add_class("sp-input")
+pa3_bayes.add_class("sp-input")
+pb_given_a1_bayes.add_class("sp-input")
+pb_given_a2_bayes.add_class("sp-input")
+pb_given_a3_bayes.add_class("sp-input")
+total_pb_button.add_class("sp-button-main")
+bayes_pa1_given_b_button.add_class("sp-button-main")
+bayes_pa2_given_b_button.add_class("sp-button-main")
+bayes_pa3_given_b_button.add_class("sp-button-main")
+
+# Tab container
+tab_container.add_class("sp-tabs")
+
+# --- Logo, Subtitle, Header ---
+logo_text = "⚡ Powered by HazemElErefy"
+logo_html_content = f"""
+<div style="
+    background: linear-gradient(145deg, #050811, #101622);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 10px 20px;
+    text-align: center;
+    line-height: 1.2;
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    transform: perspective(500px) rotateX(2deg) rotateY(-2deg);
+    transition: all 0.3s ease-in-out;
+">
+    <span style="
+        font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+        font-weight: 900;
+        font-size: 28px;
+        letter-spacing: 2px;
+        background-image: linear-gradient(45deg, #36e0ff, #7af5ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: #7af5ff;
+        text-shadow:
+            2px 2px 4px rgba(0,0,0,0.7),
+            0 0 10px #36e0ff,
+            0 0 20px #7af5ff,
+            0 0 30px #a2f9ff;
+        white-space: nowrap;
+    ">
+        {logo_text}
+    </span>
+</div>
+"""
+logo_widget = widgets.HTML(value=logo_html_content)
+
+subtitle_text = "Exclusive interactive tool for Probability"
+subtitle_html_content = f"""
+<div style="
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    color: #b4c6ff;
+    font-style: italic;
+    font-weight: 500;
+    text-align: center;
+    margin-top: 5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+">
+    {subtitle_text}
+</div>
+"""
+subtitle_widget = widgets.HTML(value=subtitle_html_content)
+
+logo_column_vbox = widgets.VBox(
+    [logo_widget, subtitle_widget],
+    layout=Layout(align_items='flex-end', margin='0 10px 0 0')
+)
+
+main_title_widget = widgets.HTML("<h2>SP Calculator</h2>")
+
+top_header_hbox = widgets.HBox(
+    [main_title_widget, logo_column_vbox],
+    layout=Layout(
+        justify_content='space-between',
+        align_items='center',
+        width='100%',
+        margin='0 0 20px 0'
+    )
+)
+
+# --- Main calculator card content ---
+calculator_card_content = widgets.VBox(
+    [
+        top_header_hbox,
+        display_output,
+        tab_container
+    ],
+    layout=Layout(
+        width='90%',
+        max_width='960px',
+        margin='30px auto',
+        align_items='stretch'
+    )
+)
+calculator_card_content.add_class("calculator-card")
+
+# --- Final GUI ---
+final_gui = widgets.VBox([style_html, calculator_card_content])
+display(final_gui)
