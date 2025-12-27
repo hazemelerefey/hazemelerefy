@@ -1,0 +1,208 @@
+# Imports for Statistics Helper
+import ipywidgets as widgets
+from IPython.display import display, HTML
+from ipywidgets import Layout
+import statistics
+from collections import Counter
+import math # Ensure math is available for sqrt if not already
+
+# --- Statistics Helper Panel Widgets ---
+stats_title = widgets.HTML("<div style='text-align: center; color: #e3ecff;'><h2>Statistics helper </h2></div>")
+data_textarea = widgets.Textarea(
+    value='1, 2, 3, 4, 5',
+    placeholder='Enter data separated by commas or spaces (e.g., 3, 4, 7, 7, 10, 12)',
+    description='Raw Data:',
+    layout=Layout(width='auto', height='100px')
+)
+data_type_dropdown = widgets.Dropdown(
+    options=['Population', 'Sample'],
+    value='Population',
+    description='Data Type:'
+)
+compute_stats_button = widgets.Button(description='Compute Statistics', button_style='info')
+stats_output_area = widgets.Output() # For displaying statistics and errors
+
+# Apply CSS classes to new widgets
+data_textarea.add_class("sp-input")
+# Dropdown styling via sp-input doesn't work directly as it's a <select>, not <input>
+# compute_stats_button.add_class("sp-button-main") # Button already has 'info' style which takes precedence
+
+# --- Helper Functions for Statistics ---
+
+def parse_data(text: str) -> list[float]:
+    if not text.strip():
+        raise ValueError("Data area is empty. Please enter some values.")
+    
+    # Replace common separators with spaces and split
+    raw_values = text.replace(',', ' ').replace(';', ' ').replace('\t', ' ').split()
+    parsed_data = []
+    for value_str in raw_values:
+        if not value_str: continue # Skip empty strings from multiple delimiters
+        try:
+            parsed_data.append(float(value_str))
+        except ValueError:
+            raise ValueError(f"Invalid input '{value_str}'. Please enter numeric values only.")
+    return parsed_data
+
+def compute_statistics(data: list[float], mode: str) -> str:
+    n = len(data)
+    if n == 0:
+        return "<p style='color: red;'>Error: No valid data points to analyze.</p>"
+
+    # Measures of Location (using statistics module)
+    mean = statistics.mean(data)
+    median = statistics.median(data)
+
+    # Mode(s) using multimode
+    try:
+        modes = statistics.multimode(data)
+        if len(modes) == n: # All values unique
+            mode_str = "No distinct mode"
+        else:
+            modes.sort()
+            mode_str = ", ".join(map(str, modes))
+    except statistics.StatisticsError:
+        mode_str = "N/A"
+
+    # Measures of Variability
+    data_range = max(data) - min(data)
+
+    stats_html = "<h3>Summary Statistics:</h3>"
+    if mode == 'Population':
+        stats_html += f"<p><b>N (Population Size):</b> {n}</p>"
+        stats_html += f"<p><b>μ (Population Mean):</b> {mean:.4f}</p>"
+        stats_html += f"<p><b>Median:</b> {median:.4f}</p>"
+        stats_html += f"<p><b>Mode(s):</b> {mode_str}</p>"
+        stats_html += f"<p><b>Range:</b> {data_range:.4f}</p>"
+        
+        try:
+            population_variance = statistics.pvariance(data)
+            population_std_dev = statistics.pstdev(data)
+            stats_html += f"<p><b>σ² (Population Variance):</b> {population_variance:.4f}</p>"
+            stats_html += f"<p><b>σ (Population Standard Deviation):</b> {population_std_dev:.4f}</p>"
+        except statistics.StatisticsError as e:
+            stats_html += f"<p style='color: orange;'>Error computing population variance/std dev: {e}. Requires at least one data point.</p>"
+
+    else: # Sample mode
+        stats_html += f"<p><b>n (Sample Size):</b> {n}</p>"
+        stats_html += f"<p><b>x̄ (Sample Mean):</b> {mean:.4f}</p>"
+        stats_html += f"<p><b>Median:</b> {median:.4f}</p>"
+        stats_html += f"<p><b>Mode(s):</b> {mode_str}</p>"
+        stats_html += f"<p><b>Range:</b> {data_range:.4f}</p>"
+
+        if n < 2:
+            stats_html += "<p style='color: orange;'>Cannot compute Sample Variance and Standard Deviation for sample size less than 2 (n-1 denominator).</p>"
+        else:
+            try:
+                sample_variance = statistics.variance(data)
+                sample_std_dev = statistics.stdev(data)
+                stats_html += f"<p><b>s² (Sample Variance):</b> {sample_variance:.4f}</p>"
+                stats_html += f"<p><b>s (Sample Standard Deviation):</b> {sample_std_dev:.4f}</p>"
+            except statistics.StatisticsError as e:
+                stats_html += f"<p style='color: orange;'>Error computing sample variance/std dev: {e}</p>"
+            
+    return stats_html
+
+def build_frequency_table(data: list[float]) -> tuple[str, str]:
+    if not data:
+        return "", ""
+
+    counts = Counter(data)
+    n = len(data)
+    
+    # Sort unique values for the table
+    unique_values = sorted(counts.keys())
+
+    table_html = "<h3>Frequency Distribution:</h3>"
+    table_html += "<table border='1' style='width:100%; border-collapse: collapse; text-align: center; color: #e3ecff; border-color: rgba(255,255,255,0.1);'>"
+    table_html += "<tr style='background: rgba(255,255,255,0.1);'><th style='padding: 8px;'>Value</th><th style='padding: 8px;'>Frequency (f)</th><th style='padding: 8px;'>Relative Frequency (f/n)</th></tr>"
+    
+    # For ASCII histogram
+    ascii_hist_lines = ["<h3>Mini Histogram:</h3>"]
+    max_hash_len = 20 # Max length of the hash bar
+    
+    # Calculate max frequency for scaling histogram hashes
+    max_freq_for_hist = max(counts.values()) if counts else 1
+
+    for val in unique_values:
+        freq = counts[val]
+        rel_freq = freq / n
+        table_html += f"<tr><td style='padding: 8px;'>{val}</td><td style='padding: 8px;'>{freq}</td><td style='padding: 8px;'>{rel_freq:.4f}</td></tr>"
+        
+        # Build ASCII histogram bar
+        hash_count = int(max_hash_len * (freq / max_freq_for_hist))
+        ascii_hist_lines.append(f"{val:<8.2f} | {'#' * hash_count} ({freq})")
+
+    table_html += "</table>"
+    
+    ascii_histogram = "<pre style='background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; color: #e3ecff; overflow-x: auto;'>\n"
+    ascii_histogram += "\n".join(ascii_hist_lines)
+    ascii_histogram += "</pre>"
+
+    return table_html, ascii_histogram
+
+# --- Event Handler for Compute Statistics Button ---
+def on_compute_stats_button_clicked(b):
+    with stats_output_area:
+        stats_output_area.clear_output()
+        data_text = data_textarea.value
+        data_mode = data_type_dropdown.value
+        
+        try:
+            parsed_data = parse_data(data_text)
+            
+            # Display summary statistics
+            summary_stats_html = compute_statistics(parsed_data, data_mode)
+            display(HTML(summary_stats_html))
+            
+            # Display frequency table and histogram
+            table_html, ascii_histogram = build_frequency_table(parsed_data)
+            if table_html:
+                display(HTML(table_html))
+            if ascii_histogram:
+                display(HTML(ascii_histogram))
+
+        except ValueError as e:
+            display(HTML(f"<p style='color: red;'>Error: {e}</p>"))
+
+# Attach event handler
+compute_stats_button.on_click(on_compute_stats_button_clicked)
+
+# --- Statistics Helper Panel Layout ---
+stats_panel = widgets.VBox(
+    [
+        stats_title,
+        data_textarea,
+        data_type_dropdown,
+        compute_stats_button,
+        stats_output_area
+    ],
+    layout=Layout(
+        width='45%', # Roughly half, allow wrap
+        max_width='420px',
+        min_width='300px', # Min width to prevent squishing
+        margin='20px',
+        border='1px solid rgba(255,255,255,0.1)',
+        border_radius='12px',
+        padding='20px',
+        background='rgba(255, 255, 255, 0.05)', # Slightly lighter card background
+        box_shadow='0 4px 15px rgba(0,0,0,0.3)',
+        overflow_y='auto' # Scroll if content is too long
+    )
+)
+stats_panel.add_class("calculator-card") # Reuse card styling, then override some if needed
+
+# --- Combined Application Layout ---
+# Assuming 'final_gui' is available from the previous cell execution
+app_layout = widgets.HBox(
+    [final_gui, stats_panel],
+    layout=Layout(
+        justify_content='center',
+        flex_wrap='wrap', # Allow wrapping on smaller screens
+        align_items='flex-start', # Align items at the top
+        width='100%'
+    )
+)
+
+# Display the combined layout
+display(app_layout)
