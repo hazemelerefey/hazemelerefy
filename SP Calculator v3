@@ -1,0 +1,611 @@
+import ipywidgets as widgets
+from IPython.display import display, HTML
+from ipywidgets import Layout
+import math
+
+# --- Output widget for displaying results ---
+display_output = widgets.Output()
+
+# --- Counting Tab widgets ---
+n_counting = widgets.IntText(description='n:', value=0, min=0)
+r_counting = widgets.IntText(description='r:', value=0, min=0)
+perm_button = widgets.Button(description='Permutations (P(n,r))', button_style='info')
+comb_button = widgets.Button(description='Combinations (C(n,r))', button_style='success')
+
+# --- Basic Probability Tab widgets ---
+favor_basic = widgets.IntText(description='Favorable Outcomes:', value=0, min=0)
+total_basic = widgets.IntText(description='Total Outcomes:', value=0, min=0)
+pa_basic = widgets.FloatText(description='P(A):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_basic = widgets.FloatText(description='P(B):', value=0.0, min=0.0, max=1.0, step=0.01)
+pa_intersect_b_basic = widgets.FloatText(description='P(A ∩ B):', value=0.0, min=0.0, max=1.0, step=0.01)
+pa_fav_total_button = widgets.Button(description='Calculate P(A)', button_style='info')
+union_button = widgets.Button(description='P(A ∪ B)', button_style='success')
+complement_button = widgets.Button(description='P(Aᶜ)', button_style='warning')
+
+# --- Conditional & Independence Tab widgets ---
+pa_cond = widgets.FloatText(description='P(A):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_cond = widgets.FloatText(description='P(B):', value=0.0, min=0.0, max=1.0, step=0.01)
+pa_intersect_b_cond = widgets.FloatText(description='P(A ∩ B):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_given_a_button = widgets.Button(description='P(B|A)', button_style='info')
+pa_given_b_button = widgets.Button(description='P(A|B)', button_style='info')
+independent_intersection_button = widgets.Button(description='P(A ∩ B) if independent', button_style='success')
+check_independence_button = widgets.Button(description='Check Independence', button_style='warning')
+
+# --- Total Probability & Bayes' Rule Tab widgets ---
+pa1_bayes = widgets.FloatText(description='P(A₁):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_given_a1_bayes = widgets.FloatText(description='P(B|A₁):', value=0.0, min=0.0, max=1.0, step=0.01)
+pa2_bayes = widgets.FloatText(description='P(A₂):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_given_a2_bayes = widgets.FloatText(description='P(B|A₂):', value=0.0, min=0.0, max=1.0, step=0.01)
+pa3_bayes = widgets.FloatText(description='P(A₃):', value=0.0, min=0.0, max=1.0, step=0.01)
+pb_given_a3_bayes = widgets.FloatText(description='P(B|A₃):', value=0.0, min=0.0, max=1.0, step=0.01)
+total_pb_button = widgets.Button(description='P(B) (Total Probability)', button_style='info')
+bayes_pa1_given_b_button = widgets.Button(description='P(A₁|B) (Bayes)', button_style='success')
+bayes_pa2_given_b_button = widgets.Button(description='P(A₂|B) (Bayes)', button_style='success')
+bayes_pa3_given_b_button = widgets.Button(description='P(A₃|B) (Bayes)', button_style='success')
+
+# --- Tab Content Layouts (placeholder for now) ---
+counting_tab_content = widgets.VBox([n_counting, r_counting, perm_button, comb_button])
+basic_prob_tab_content = widgets.VBox([favor_basic, total_basic, pa_basic, pb_basic, pa_intersect_b_basic, pa_fav_total_button, union_button, complement_button])
+cond_ind_tab_content = widgets.VBox([pa_cond, pb_cond, pa_intersect_b_cond, pb_given_a_button, pa_given_b_button, independent_intersection_button, check_independence_button])
+bayes_tab_content = widgets.VBox([pa1_bayes, pb_given_a1_bayes, pa2_bayes, pb_given_a2_bayes, pa3_bayes, pb_given_a3_bayes, total_pb_button, bayes_pa1_given_b_button, bayes_pa2_given_b_button, bayes_pa3_given_b_button])
+
+# --- Tab Container ---
+tab_container = widgets.Tab()
+tab_container.children = [
+    counting_tab_content,
+    basic_prob_tab_content,
+    cond_ind_tab_content,
+    bayes_tab_content
+]
+tab_container.set_title(0, 'Counting')
+tab_container.set_title(1, 'Basic Probability')
+tab_container.set_title(2, 'Conditional & Ind.')
+tab_container.set_title(3, 'Total Prob. & Bayes')
+
+# --- Calculation Functions ---
+def calculate_permutations(n, r):
+    if r < 0 or r > n:
+        return "Error: r must be between 0 and n"
+    return math.factorial(n) // math.factorial(n - r)
+
+def calculate_combinations(n, r):
+    if r < 0 or r > n:
+        return "Error: r must be between 0 and n"
+    return math.factorial(n) // (math.factorial(r) * math.factorial(n - r))
+
+def calculate_p_a(favorable, total):
+    if total == 0:
+        return "Error: Total outcomes cannot be zero"
+    if favorable < 0 or favorable > total:
+        return "Error: Favorable outcomes must be between 0 and total outcomes"
+    return favorable / total
+
+def calculate_union(pa, pb, pa_intersect_b):
+    if not (0 <= pa <= 1 and 0 <= pb <= 1 and 0 <= pa_intersect_b <= 1):
+        return "Error: Probabilities must be between 0 and 1"
+    return pa + pb - pa_intersect_b
+
+def calculate_complement(pa):
+    if not (0 <= pa <= 1):
+        return "Error: Probability must be between 0 and 1"
+    return 1 - pa
+
+def calculate_pb_given_a(pa_intersect_b, pa):
+    if pa == 0:
+        return "Error: P(A) cannot be zero for conditional probability"
+    if not (0 <= pa_intersect_b <= pa):
+        return "Error: P(A ∩ B) must be less than or equal to P(A)"
+    return pa_intersect_b / pa
+
+def calculate_pa_given_b(pa_intersect_b, pb):
+    if pb == 0:
+        return "Error: P(B) cannot be zero for conditional probability"
+    if not (0 <= pa_intersect_b <= pb):
+        return "Error: P(A ∩ B) must be less than or equal to P(B)"
+    return pa_intersect_b / pb
+
+def calculate_independent_intersection(pa, pb):
+    if not (0 <= pa <= 1 and 0 <= pb <= 1):
+        return "Error: Probabilities must be between 0 and 1"
+    return pa * pb
+
+def check_independence(pa, pb, pa_intersect_b):
+    if not (0 <= pa <= 1 and 0 <= pb <= 1 and 0 <= pa_intersect_b <= 1):
+        return "Error: Probabilities must be between 0 and 1"
+    if abs(pa_intersect_b - (pa * pb)) < 1e-9: # Using a small tolerance for float comparison
+        return "Events A and B are independent."
+    else:
+        return "Events A and B are not independent."
+
+def calculate_total_pb(pa1, pb_given_a1, pa2, pb_given_a2, pa3, pb_given_a3):
+    total_prob = 0.0
+    if pa1 is not None and pb_given_a1 is not None: total_prob += pa1 * pb_given_a1
+    if pa2 is not None and pb_given_a2 is not None: total_prob += pa2 * pb_given_a2
+    if pa3 is not None and pb_given_a3 is not None: total_prob += pa3 * pb_given_a3
+
+    if not (0 <= total_prob <= 1 + 1e-9):
+         return "Error: Total probability out of bounds. Check input probabilities."
+    return total_prob
+
+def calculate_bayes_pa_given_b(pa_k, pb_given_ak, total_pb):
+    if total_pb == 0:
+        return "Error: P(B) cannot be zero for Bayes' Theorem."
+    if not (0 <= pa_k <= 1 and 0 <= pb_given_ak <= 1):
+        return "Error: Probabilities must be between 0 and 1"
+    return (pa_k * pb_given_ak) / total_pb
+
+
+# --- Event Handlers ---
+def on_perm_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        n_val = n_counting.value
+        r_val = r_counting.value
+        result = calculate_permutations(n_val, r_val)
+        print(f"Permutations P({n_val},{r_val}) = {result}")
+
+def on_comb_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        n_val = n_counting.value
+        r_val = r_counting.value
+        result = calculate_combinations(n_val, r_val)
+        print(f"Combinations C({n_val},{r_val}) = {result}")
+
+def on_pa_fav_total_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        fav = favor_basic.value
+        total = total_basic.value
+        result = calculate_p_a(fav, total)
+        print(f"P(A) = {result}")
+
+def on_union_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa = pa_basic.value
+        pb = pb_basic.value
+        pa_intersect_b = pa_intersect_b_basic.value
+        result = calculate_union(pa, pb, pa_intersect_b)
+        print(f"P(A ∪ B) = {result}")
+
+def on_complement_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa = pa_basic.value
+        result = calculate_complement(pa)
+        print(f"P(Aᶜ) = {result}")
+
+def on_pb_given_a_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa_inter_b = pa_intersect_b_cond.value
+        pa = pa_cond.value
+        result = calculate_pb_given_a(pa_inter_b, pa)
+        print(f"P(B|A) = {result}")
+
+def on_pa_given_b_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa_inter_b = pa_intersect_b_cond.value
+        pb = pb_cond.value
+        result = calculate_pa_given_b(pa_inter_b, pb)
+        print(f"P(A|B) = {result}")
+
+def on_independent_intersection_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa = pa_cond.value
+        pb = pb_cond.value
+        result = calculate_independent_intersection(pa, pb)
+        print(f"P(A ∩ B) if independent = {result}")
+
+def on_check_independence_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa = pa_cond.value
+        pb = pb_cond.value
+        pa_inter_b = pa_intersect_b_cond.value
+        result = check_independence(pa, pb, pa_inter_b)
+        print(result)
+
+def on_total_pb_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa1 = pa1_bayes.value
+        pb_a1 = pb_given_a1_bayes.value
+        pa2 = pa2_bayes.value
+        pb_a2 = pb_given_a2_bayes.value
+        pa3 = pa3_bayes.value
+        pb_a3 = pb_given_a3_bayes.value
+
+        # Handle cases where not all A's are used
+        active_pa_values = [v for v in [pa1, pa2, pa3] if v is not None and v != 0.0]
+        if sum(active_pa_values) > 1 + 1e-9: # Allow for float inaccuracies
+            print("Error: Sum of P(A_i) exceeds 1.0")
+            return
+
+        total_pb_val = calculate_total_pb(pa1, pb_a1, pa2, pb_a2, pa3, pb_a3)
+        if isinstance(total_pb_val, str):
+            print(total_pb_val)
+        else:
+            print(f"P(B) (Total Probability) = {total_pb_val:.4f}")
+
+def on_bayes_pa1_given_b_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa1 = pa1_bayes.value
+        pb_a1 = pb_given_a1_bayes.value
+        pa2 = pa2_bayes.value
+        pb_a2 = pb_given_a2_bayes.value
+        pa3 = pa3_bayes.value
+        pb_a3 = pb_given_a3_bayes.value
+
+        total_pb_val = calculate_total_pb(pa1, pb_a1, pa2, pb_a2, pa3, pb_a3)
+        if isinstance(total_pb_val, str):
+            print(total_pb_val)
+            return
+
+        if pa1 == 0.0: print("Error: P(A1) cannot be zero"); return
+
+        result = calculate_bayes_pa_given_b(pa1, pb_a1, total_pb_val)
+        if isinstance(result, str):
+            print(result)
+        else:
+            print(f"P(A₁|B) = {result:.4f}")
+
+def on_bayes_pa2_given_b_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa1 = pa1_bayes.value
+        pb_a1 = pb_given_a1_bayes.value
+        pa2 = pa2_bayes.value
+        pb_a2 = pb_given_a2_bayes.value
+        pa3 = pa3_bayes.value
+        pb_a3 = pb_given_a3_bayes.value
+
+        total_pb_val = calculate_total_pb(pa1, pb_a1, pa2, pb_a2, pa3, pb_a3)
+        if isinstance(total_pb_val, str):
+            print(total_pb_val)
+            return
+
+        if pa2 == 0.0: print("Error: P(A2) cannot be zero"); return
+
+        result = calculate_bayes_pa_given_b(pa2, pb_a2, total_pb_val)
+        if isinstance(result, str):
+            print(result)
+        else:
+            print(f"P(A₂|B) = {result:.4f}")
+
+def on_bayes_pa3_given_b_button_clicked(b):
+    with display_output:
+        display_output.clear_output()
+        pa1 = pa1_bayes.value
+        pb_a1 = pb_given_a1_bayes.value
+        pa2 = pa2_bayes.value
+        pb_a2 = pb_given_a2_bayes.value
+        pa3 = pa3_bayes.value
+        pb_a3 = pb_given_a3_bayes.value
+
+        total_pb_val = calculate_total_pb(pa1, pb_a1, pa2, pb_a2, pa3, pb_a3)
+        if isinstance(total_pb_val, str):
+            print(total_pb_val)
+            return
+
+        if pa3 == 0.0: print("Error: P(A3) cannot be zero"); return
+
+        result = calculate_bayes_pa_given_b(pa3, pb_a3, total_pb_val)
+        if isinstance(result, str):
+            print(result)
+        else:
+            print(f"P(A₃|B) = {result:.4f}")
+
+# --- Attach event handlers to buttons ---
+perm_button.on_click(on_perm_button_clicked)
+comb_button.on_click(on_comb_button_clicked)
+pa_fav_total_button.on_click(on_pa_fav_total_button_clicked)
+union_button.on_click(on_union_button_clicked)
+complement_button.on_click(on_complement_button_clicked)
+pb_given_a_button.on_click(on_pb_given_a_button_clicked)
+pa_given_b_button.on_click(on_pa_given_b_button_clicked)
+independent_intersection_button.on_click(on_independent_intersection_button_clicked)
+check_independence_button.on_click(on_check_independence_button_clicked)
+total_pb_button.on_click(on_total_pb_button_clicked)
+bayes_pa1_given_b_button.on_click(on_bayes_pa1_given_b_button_clicked)
+bayes_pa2_given_b_button.on_click(on_bayes_pa2_given_b_button_clicked)
+bayes_pa3_given_b_button.on_click(on_bayes_pa3_given_b_button_clicked)
+
+
+# --- Comprehensive CSS for internal widget styling and global overrides ---
+full_css_content = f"""
+<style>
+/* Global Page Styling (from previous steps, combined here) */
+body {{
+    background: linear-gradient(135deg, #0b1020, #19243a);
+    background-attachment: fixed;
+    margin: 0;
+    padding: 0;
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif; /* Consistent font for body */
+}}
+
+
+/* Card styling applied to the main calculator content VBox */
+/* This targets the VBox that becomes the main calculator card. */
+.calculator-card {{
+    background: rgba(255, 255, 255, 0.08); /* Semi-transparent background for card */
+    border-radius: 24px; /* Rounded corners */
+    padding: 32px; /* Soft inner padding */
+    box-shadow: 0 18px 45px rgba(0,0,0,0.5); /* Large, very soft box-shadow */
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px); /* Webkit prefix for compatibility */
+    color: #e3ecff; /* Default text color inside card */
+}}
+
+
+/* Internal Widget Styling */
+
+
+/* General widget-label styling for all ipywidgets labels */
+.widget-label {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    color: #c8d2ff; /* Soft desaturated blue */
+    letter-spacing: 0.5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+    direction: ltr; /* Ensure LTR direction for text alignment */
+    unicode-bidi: plaintext; /* Ensure numbers are not affected by surrounding text direction */
+}}
+
+
+/* Input Boxes (IntText, FloatText, Text) - 3D & Eye-Friendly */
+/* مهم: نستهدف كل input داخل sp-input سواء كان type=text أو number */
+.sp-input input {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(145deg, #1c2333, #111622); /* Dark textured background */
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #e3ecff; /* Light text color */
+    box-shadow:
+        4px 4px 10px rgba(0,0,0,0.65), /* Depth shadow */
+        -3px -3px 8px rgba(255,255,255,0.04); /* Light source highlight */
+    transition: all 0.2s ease-in-out;
+    outline: none;
+    -webkit-appearance: none; /* Remove default browser styling */
+
+    /* Force Western Numerals (0-9) */
+    direction: ltr !important;
+    unicode-bidi: plaintext !important;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum", "tnum";
+}}
+
+.sp-input input:focus {{
+    border-color: #33e0ff; /* Accent color on focus */
+    box-shadow:
+        0 0 15px rgba(51, 224, 255, 0.6), /* Soft cyan glow */
+        4px 4px 12px rgba(0,0,0,0.7); /* Stronger depth shadow */
+}}
+
+
+/* Buttons (Slight 3D) */
+.sp-button-main .widget-button {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    border-radius: 12px;
+    border: none;
+    color: #e3ecff;
+    padding: 8px 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background-size: 200% auto; /* For gradient animation */
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.55); /* Initial 3D lift */
+    position: relative;
+    overflow: hidden;
+}}
+
+
+/* Specific background gradients for different button_styles */
+.sp-button-main.mod-success .widget-button {{
+    background-image: linear-gradient(to right, #37d46b 0%, #2ca956 50%, #37d46b 100%);
+}}
+.sp-button-main.mod-info .widget-button {{
+    background-image: linear-gradient(to right, #33aaff 0%, #2087e6 50%, #33aaff 100%);
+}}
+.sp-button-main.mod-warning .widget-button {{
+    background-image: linear-gradient(to right, #ffcc00 0%, #cc9900 50%, #ffcc00 100%);
+    color: #222a3b; /* Darker text for warning contrast */
+}}
+
+.sp-button-main .widget-button:hover {{
+    background-position: right center;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.65);
+}}
+
+.sp-button-main .widget-button:active {{
+    transform: translateY(1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+}}
+
+
+/* Tabs */
+.sp-tabs .p-TabBar-tab {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(145deg, #151a26, #1c2435); /* Background inside card */
+    color: #7f8bb8; /* Muted text */
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom: 2px solid transparent; /* Placeholder for active border */
+    transition: all 0.2s ease-in-out;
+    margin-right: 5px;
+    padding: 8px 15px;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2), inset -2px -2px 5px rgba(255,255,255,0.02); /* Inner shadow for depth */
+}}
+
+.sp-tabs .p-TabBar-tab.p-mod-current {{
+    background: linear-gradient(145deg, #1e2738, #111622); /* Active tab background, slightly different */
+    color: #e3ecff; /* Bright text for active */
+    border-bottom: 2px solid #33e0ff; /* Cyan accent border */
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.3), inset 2px 2px 5px rgba(0,0,0,0.3); /* Enhanced shadow for active */
+}}
+
+.sp-tabs .p-TabBar-tab:hover:not(.p-mod-current) {{
+    background: linear-gradient(145deg, #1c2435, #151a26);
+    color: #a0aec0;
+}}
+
+
+/* Adjust general headings/HTML within the calculator for dark theme */
+h2 {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+    color: #e3ecff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+}}
+
+
+/* Styling for the display_output (HTML widget) to ensure correct font and numeral display */
+div[data-jupyter-widget-model-id]:has(div[style*="white-space: normal"]) > div {{
+    font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif !important;
+    direction: ltr !important;
+    unicode-bidi: plaintext !important;
+    font-feature-settings: "lnum", "tnum" !important;
+}}
+</style>
+"""
+
+style_html = widgets.HTML(value=full_css_content)
+
+# --- Apply classes to existing widgets ---
+
+# Counting Tab widgets
+n_counting.add_class("sp-input")
+r_counting.add_class("sp-input")
+perm_button.add_class("sp-button-main")
+comb_button.add_class("sp-button-main")
+
+# Basic Probability Tab widgets
+favor_basic.add_class("sp-input")
+total_basic.add_class("sp-input")
+pa_basic.add_class("sp-input")
+pb_basic.add_class("sp-input")
+pa_intersect_b_basic.add_class("sp-input")
+pa_fav_total_button.add_class("sp-button-main")
+union_button.add_class("sp-button-main")
+complement_button.add_class("sp-button-main")
+
+# Conditional & Independence Tab widgets
+pa_cond.add_class("sp-input")
+pb_cond.add_class("sp-input")
+pa_intersect_b_cond.add_class("sp-input")
+pb_given_a_button.add_class("sp-button-main")
+pa_given_b_button.add_class("sp-button-main")
+independent_intersection_button.add_class("sp-button-main")
+check_independence_button.add_class("sp-button-main")
+
+# Total Probability & Bayes' Rule Tab widgets
+pa1_bayes.add_class("sp-input")
+pb_given_a1_bayes.add_class("sp-input")
+pa2_bayes.add_class("sp-input")
+pb_given_a2_bayes.add_class("sp-input")
+pa3_bayes.add_class("sp-input")
+pb_given_a3_bayes.add_class("sp-input")
+total_pb_button.add_class("sp-button-main")
+bayes_pa1_given_b_button.add_class("sp-button-main")
+bayes_pa2_given_b_button.add_class("sp-button-main")
+bayes_pa3_given_b_button.add_class("sp-button-main")
+
+# Tab container
+tab_container.add_class("sp-tabs")
+
+# --- Logo, Subtitle, Header ---
+logo_text = "⚡ Powered by HazemElErefy"
+logo_html_content = f"""
+<div style="
+    background: linear-gradient(145deg, #050811, #101622);
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 10px 20px;
+    text-align: center;
+    line-height: 1.2;
+    position: relative;
+    z-index: 1;
+    display: inline-block;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+    transform: perspective(500px) rotateX(2deg) rotateY(-2deg);
+    transition: all 0.3s ease-in-out;
+">
+    <span style="
+        font-family: 'Poppins', 'Segoe UI', system-ui, sans-serif;
+        font-weight: 900;
+        font-size: 28px;
+        letter-spacing: 2px;
+        background-image: linear-gradient(45deg, #36e0ff, #7af5ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: #7af5ff;
+        text-shadow:
+            2px 2px 4px rgba(0,0,0,0.7),
+            0 0 10px #36e0ff,
+            0 0 20px #7af5ff,
+            0 0 30px #a2f9ff;
+        white-space: nowrap;
+    ">
+        {logo_text}
+    </span>
+</div>
+"""
+logo_widget = widgets.HTML(value=logo_html_content)
+
+subtitle_text = "Exclusive interactive tool for Probability"
+subtitle_html_content = f"""
+<div style="
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    color: #b4c6ff;
+    font-style: italic;
+    font-weight: 500;
+    text-align: center;
+    margin-top: 5px;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+">
+    {subtitle_text}
+</div>
+"""
+subtitle_widget = widgets.HTML(value=subtitle_html_content)
+
+logo_column_vbox = widgets.VBox(
+    [logo_widget, subtitle_widget],
+    layout=Layout(align_items='flex-end', margin='0 10px 0 0')
+)
+
+main_title_widget = widgets.HTML("<h2>SP Calculator</h2>")
+
+top_header_hbox = widgets.HBox(
+    [main_title_widget, logo_column_vbox],
+    layout=Layout(
+        justify_content='space-between',
+        align_items='center',
+        width='100%',
+        margin='0 0 20px 0'
+    )
+)
+
+# --- Main calculator card content ---
+calculator_card_content = widgets.VBox(
+    [
+        top_header_hbox,
+        display_output,
+        tab_container
+    ],
+    layout=Layout(
+        width='90%',
+        max_width='960px',
+        margin='30px auto',
+        align_items='stretch'
+    )
+)
+calculator_card_content.add_class("calculator-card")
+
+# --- Final GUI ---
+final_gui = widgets.VBox([style_html, calculator_card_content])
+display(final_gui)
